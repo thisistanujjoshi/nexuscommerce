@@ -29,7 +29,7 @@ docs/               # Architecture notes and ADRs
 
 ## Roadmap
 
-- [ ] **Phase 1** — Catalog + Orders services, database schemas, unit tests
+- [x] **Phase 1** — Catalog + Orders services, database schemas, unit tests
 - [ ] **Phase 2** — React storefront + Vue admin dashboard
 - [ ] **Phase 3** — Notifications service, message queue, event-driven integration
 - [ ] **Phase 4** — AI support chatbot, API gateway with JWT auth

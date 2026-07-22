@@ -7,7 +7,14 @@
     <Project Path="src/Services/Catalog/Catalog.Domain/Catalog.Domain.csproj" />
     <Project Path="src/Services/Catalog/Catalog.Infrastructure/Catalog.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Services/Orders/">
+    <Project Path="src/Services/Orders/Orders.Api/Orders.Api.csproj" />
+    <Project Path="src/Services/Orders/Orders.Application/Orders.Application.csproj" />
+    <Project Path="src/Services/Orders/Orders.Domain/Orders.Domain.csproj" />
+    <Project Path="src/Services/Orders/Orders.Infrastructure/Orders.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Catalog.UnitTests/Catalog.UnitTests.csproj" />
+    <Project Path="tests/Orders.UnitTests/Orders.UnitTests.csproj" />
   </Folder>
 </Solution>
