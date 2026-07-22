@@ -20,10 +20,13 @@ Every service exposes REST endpoints documented with OpenAPI/Swagger.
 
 ```
 src/
+  Gateway/
+    Gateway.Api/    # YARP reverse proxy + JWT auth (single public entry point)
   Services/
     Catalog/        # Catalog.Api, Catalog.Application, Catalog.Domain, Catalog.Infrastructure
     Orders/         # Orders.Api, Orders.Application, Orders.Domain, Orders.Infrastructure
     Notifications/  # Python FastAPI event consumer (app/ + pytest tests/)
+    AiSupport/      # Python FastAPI product Q&A chatbot (Claude API, catalog-grounded)
   Web/
     storefront/     # React + TypeScript customer storefront (Vite)
     admin/          # Vue 3 + TypeScript admin dashboard (Vite)
@@ -36,7 +39,7 @@ docs/               # Architecture notes and ADRs
 - [x] **Phase 1** — Catalog + Orders services, database schemas, unit tests
 - [x] **Phase 2** — React storefront + Vue admin dashboard
 - [x] **Phase 3** — Notifications service, message queue, event-driven integration
-- [ ] **Phase 4** — AI support chatbot, API gateway with JWT auth
+- [x] **Phase 4** — AI support chatbot, API gateway with JWT auth
 - [ ] **Phase 5** — Docker, Kubernetes + Helm, Terraform, CI/CD pipelines
 
 ## Getting started
@@ -71,6 +74,35 @@ python -m venv .venv && .venv/Scripts/pip install -e ".[dev]"   # Scripts -> bin
 In development, Orders publishes `order.placed` / `order.status-changed` events over HTTP
 straight to the Notifications ingress; with a broker available both sides switch to
 RabbitMQ via configuration (`EventBus:Transport` / `NOTIF_TRANSPORT`) — see ADR 0003.
+
+Run the AI Support chatbot (Python 3.12+, same venv steps as Notifications):
+
+```bash
+cd src/Services/AiSupport
+.venv/Scripts/python -m uvicorn app.main:app --port 5104   # http://localhost:5104 (docs at /docs)
+```
+
+Set `ANTHROPIC_API_KEY` for real answers (model: `AISUPPORT_MODEL`, default
+`claude-opus-4-8`), or `AISUPPORT_LLM=stub` for a deterministic offline mode.
+
+Run the API gateway:
+
+```bash
+dotnet run --project src/Gateway/Gateway.Api                # http://localhost:5100
+```
+
+The gateway is the single public entry point. Get a token, then call any service
+through it (`/catalog`, `/orders`, `/notifications`, `/ai` + the service's own path):
+
+```bash
+curl -X POST http://localhost:5100/auth/token -H "Content-Type: application/json" \
+  -d '{"username":"demo","password":"demo123"}'
+curl http://localhost:5100/orders/api/v1/orders -H "Authorization: Bearer <token>"
+```
+
+Demo users: `admin/admin123` (admin role), `demo/demo123` (customer). Catalog reads and
+AI chat are anonymous; orders require a token; catalog writes and notifications require
+the admin role — see ADR 0004.
 
 ## Local infrastructure (Docker)
 
