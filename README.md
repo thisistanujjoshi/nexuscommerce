@@ -72,6 +72,24 @@ In development, Orders publishes `order.placed` / `order.status-changed` events 
 straight to the Notifications ingress; with a broker available both sides switch to
 RabbitMQ via configuration (`EventBus:Transport` / `NOTIF_TRANSPORT`) — see ADR 0003.
 
+## Local infrastructure (Docker)
+
+`infra/docker-compose.dev.yml` provides the backing services with dev-only credentials,
+grouped into profiles so you only pay the RAM for what you're using:
+
+```bash
+docker compose -f infra/docker-compose.dev.yml --profile broker up -d     # RabbitMQ + MongoDB
+docker compose -f infra/docker-compose.dev.yml --profile databases up -d  # SQL Server + PostgreSQL
+docker compose -f infra/docker-compose.dev.yml --profile all up -d        # everything
+```
+
+With the broker profile running, switch the event flow onto RabbitMQ:
+
+- Orders: set `EventBus:Transport` to `RabbitMq` (appsettings or env var)
+- Notifications: run with `NOTIF_TRANSPORT=rabbitmq` (and `NOTIF_STORE=mongodb` for Mongo)
+
+The RabbitMQ management UI is at http://localhost:15672 (guest/guest).
+
 Run the frontends (Node 20+):
 
 ```bash

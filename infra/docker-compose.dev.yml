@@ -1,0 +1,61 @@
+# Local development infrastructure for NexusCommerce.
+# Dev-only credentials — real environments get theirs from Azure Key Vault (Phase 5).
+#
+#   docker compose -f infra/docker-compose.dev.yml --profile broker up -d     # RabbitMQ + MongoDB
+#   docker compose -f infra/docker-compose.dev.yml --profile databases up -d  # SQL Server + PostgreSQL
+#   docker compose -f infra/docker-compose.dev.yml --profile all up -d        # everything
+#
+# Profiles exist so low-RAM machines can start only what a task needs.
+
+name: nexuscommerce-dev
+
+services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    profiles: ["broker", "all"]
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # management UI (guest/guest)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:8
+    profiles: ["broker", "all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  postgres:
+    image: postgres:17-alpine
+    profiles: ["databases", "all"]
+    environment:
+      POSTGRES_DB: nexus_orders
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: nexus_dev_pw
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    profiles: ["databases", "all"]
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "NexusDev!Passw0rd"
+      MSSQL_PID: Developer
+      MSSQL_MEMORY_LIMIT_MB: "1536"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+
+volumes:
+  mongo-data:
+  postgres-data:
+  sqlserver-data:
