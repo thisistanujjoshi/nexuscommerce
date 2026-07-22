@@ -1,0 +1,37 @@
+# .NET
+bin/
+obj/
+out/
+*.user
+*.suo
+.vs/
+artifacts/
+TestResults/
+*.binlog
+
+# Rider / VS Code
+.idea/
+.vscode/
+
+# Node
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Local dev databases
+*.db
+*.db-shm
+*.db-wal
+
+# OS
+Thumbs.db
+.DS_Store
