@@ -1,0 +1,160 @@
+# Full NexusCommerce platform, containerised.
+#
+#   docker compose build           # build all service images
+#   docker compose up -d           # run the whole platform
+#   docker compose down            # stop everything
+#
+# Host ports match the local-dev ports so the browser bundles work unchanged.
+# Catalog runs on SQLite (light); Orders runs on a real PostgreSQL to show the
+# managed-database path; the event backbone is RabbitMQ + MongoDB. Swap Catalog
+# to SQL Server by flipping Database__Provider + the connection string.
+#
+# Dev-only credentials throughout — real deployments inject secrets from Key
+# Vault via the Helm chart (see deploy/helm) and Terraform (see deploy/terraform).
+
+name: nexuscommerce
+
+services:
+  # ---- Backing infrastructure -------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:4-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mongodb:
+    image: mongo:8
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: nexus_orders
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: nexus_dev_pw
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus -d nexus_orders"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ---- Application services ----------------------------------------------------
+  catalog:
+    build:
+      context: .
+      dockerfile: src/Services/Catalog/Catalog.Api/Dockerfile
+    image: nexuscommerce/catalog:latest
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Database__Provider: Sqlite
+      ConnectionStrings__CatalogDb: "Data Source=/tmp/catalog.db"
+    ports:
+      - "5101:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  orders:
+    build:
+      context: .
+      dockerfile: src/Services/Orders/Orders.Api/Dockerfile
+    image: nexuscommerce/orders:latest
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Database__Provider: PostgreSql
+      ConnectionStrings__OrdersDb: "Host=postgres;Database=nexus_orders;Username=nexus;Password=nexus_dev_pw"
+      EventBus__Transport: RabbitMq
+      EventBus__AmqpUri: "amqp://guest:guest@rabbitmq:5672/"
+      EventBus__Exchange: nexus.events
+    ports:
+      - "5102:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  notifications:
+    build:
+      context: src/Services/Notifications
+    image: nexuscommerce/notifications:latest
+    environment:
+      NOTIF_TRANSPORT: rabbitmq
+      NOTIF_AMQP_URL: "amqp://guest:guest@rabbitmq:5672/"
+      NOTIF_STORE: mongodb
+      NOTIF_MONGO_URL: "mongodb://mongodb:27017"
+    ports:
+      - "5103:8080"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+
+  aisupport:
+    build:
+      context: src/Services/AiSupport
+    image: nexuscommerce/aisupport:latest
+    environment:
+      # Defaults to the offline stub so the stack runs without an API key.
+      # For real answers: AISUPPORT_LLM=anthropic and pass ANTHROPIC_API_KEY.
+      AISUPPORT_LLM: "${AISUPPORT_LLM:-stub}"
+      AISUPPORT_CATALOG_URL: "http://catalog:8080"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+    ports:
+      - "5104:8080"
+    depends_on:
+      catalog:
+        condition: service_healthy
+
+  gateway:
+    build:
+      context: .
+      dockerfile: src/Gateway/Gateway.Api/Dockerfile
+    image: nexuscommerce/gateway:latest
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ReverseProxy__Clusters__catalog__Destinations__d1__Address: "http://catalog:8080/"
+      ReverseProxy__Clusters__orders__Destinations__d1__Address: "http://orders:8080/"
+      ReverseProxy__Clusters__notifications__Destinations__d1__Address: "http://notifications:8080/"
+      ReverseProxy__Clusters__ai__Destinations__d1__Address: "http://aisupport:8080/"
+    ports:
+      - "5100:8080"
+    depends_on:
+      - catalog
+      - orders
+      - notifications
+      - aisupport
+
+  storefront:
+    build:
+      context: src/Web/storefront
+    image: nexuscommerce/storefront:latest
+    ports:
+      - "5173:8080"
+
+  admin:
+    build:
+      context: src/Web/admin
+    image: nexuscommerce/admin:latest
+    ports:
+      - "5174:8080"
+
+volumes:
+  mongo-data:
+  postgres-data:

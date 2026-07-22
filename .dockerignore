@@ -1,0 +1,14 @@
+# Repo-root ignore for the .NET image builds (context = repo root).
+**/bin/
+**/obj/
+**/.vs/
+**/node_modules/
+**/dist/
+**/.venv/
+**/__pycache__/
+**/*.db
+**/*.db-shm
+**/*.db-wal
+.git/
+docs/
+tests/

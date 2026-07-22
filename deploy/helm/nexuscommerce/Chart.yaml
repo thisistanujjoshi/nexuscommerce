@@ -1,0 +1,13 @@
+apiVersion: v2
+name: nexuscommerce
+description: NexusCommerce distributed order-management platform — all services in one umbrella chart
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - microservices
+  - ecommerce
+  - dotnet
+  - fastapi
+maintainers:
+  - name: Tanuj Joshi

@@ -1,0 +1,26 @@
+# Development overrides: single replicas, catalog on SQLite, latest images.
+image:
+  tag: latest
+  pullPolicy: Always
+
+ingress:
+  host: dev.nexuscommerce.local
+
+secrets:
+  catalogDbConnection: "Data Source=/tmp/catalog.db"
+
+services:
+  gateway:
+    replicas: 1
+  catalog:
+    replicas: 1
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      Database__Provider: Sqlite
+  orders:
+    replicas: 1
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+  aisupport:
+    env:
+      AISUPPORT_LLM: stub

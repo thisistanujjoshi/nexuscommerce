@@ -1,0 +1,94 @@
+# Base values — overridden per environment by values-{dev,staging,prod}.yaml.
+
+# Container image registry. Real deployments point this at the Azure Container
+# Registry provisioned by Terraform (see deploy/terraform).
+image:
+  registry: nexuscommerce
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Ingress fronts the gateway only — every other service is cluster-internal.
+ingress:
+  enabled: true
+  className: nginx
+  host: nexuscommerce.local
+
+# Sensitive values. In a real cluster these come from Azure Key Vault via the
+# Secrets Store CSI driver; here they are chart values for demo purposes and
+# rendered into a Kubernetes Secret.
+secrets:
+  ordersDbConnection: "Host=postgres;Database=nexus_orders;Username=nexus;Password=nexus_dev_pw"
+  catalogDbConnection: ""
+  jwtSigningKey: "dev-only-signing-key-change-me-0123456789abcdef"
+  anthropicApiKey: ""
+
+# Per-service definitions. The deployment/service templates range over this map,
+# so adding a service is a values change, not a new template.
+services:
+  gateway:
+    replicas: 2
+    port: 8080
+    public: true            # exposed through the ingress
+    env:
+      ASPNETCORE_ENVIRONMENT: Production
+      ReverseProxy__Clusters__catalog__Destinations__d1__Address: "http://catalog:8080/"
+      ReverseProxy__Clusters__orders__Destinations__d1__Address: "http://orders:8080/"
+      ReverseProxy__Clusters__notifications__Destinations__d1__Address: "http://notifications:8080/"
+      ReverseProxy__Clusters__ai__Destinations__d1__Address: "http://aisupport:8080/"
+    secretEnv:
+      Auth__SigningKey: jwtSigningKey
+
+  catalog:
+    replicas: 2
+    port: 8080
+    env:
+      ASPNETCORE_ENVIRONMENT: Production
+      Database__Provider: SqlServer
+    secretEnv:
+      ConnectionStrings__CatalogDb: catalogDbConnection
+
+  orders:
+    replicas: 2
+    port: 8080
+    env:
+      ASPNETCORE_ENVIRONMENT: Production
+      Database__Provider: PostgreSql
+      EventBus__Transport: RabbitMq
+      EventBus__AmqpUri: "amqp://guest:guest@rabbitmq:5672/"
+      EventBus__Exchange: nexus.events
+    secretEnv:
+      ConnectionStrings__OrdersDb: ordersDbConnection
+
+  notifications:
+    replicas: 1
+    port: 8080
+    env:
+      NOTIF_TRANSPORT: rabbitmq
+      NOTIF_AMQP_URL: "amqp://guest:guest@rabbitmq:5672/"
+      NOTIF_STORE: mongodb
+      NOTIF_MONGO_URL: "mongodb://mongodb:27017"
+
+  aisupport:
+    replicas: 1
+    port: 8080
+    env:
+      AISUPPORT_LLM: anthropic
+      AISUPPORT_CATALOG_URL: "http://catalog:8080"
+    secretEnv:
+      ANTHROPIC_API_KEY: anthropicApiKey
+
+  storefront:
+    replicas: 1
+    port: 8080
+
+  admin:
+    replicas: 1
+    port: 8080
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

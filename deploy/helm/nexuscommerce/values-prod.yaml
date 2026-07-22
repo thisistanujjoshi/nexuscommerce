@@ -1,0 +1,27 @@
+# Production overrides: pinned image tag, higher replica counts, real host.
+image:
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+ingress:
+  host: shop.nexuscommerce.example
+
+services:
+  gateway:
+    replicas: 3
+  catalog:
+    replicas: 3
+  orders:
+    replicas: 3
+  notifications:
+    replicas: 2
+  aisupport:
+    replicas: 2
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
