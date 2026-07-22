@@ -1,0 +1,83 @@
+name: CD
+
+# Build and push images to the Azure Container Registry, then deploy to AKS
+# via Helm. Runs on version tags. Requires repository secrets:
+#   AZURE_CREDENTIALS, ACR_LOGIN_SERVER, AKS_RESOURCE_GROUP, AKS_CLUSTER_NAME
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        options: [dev, staging, prod]
+        default: dev
+
+env:
+  ENVIRONMENT: ${{ github.event.inputs.environment || 'staging' }}
+
+jobs:
+  build-push:
+    name: Build & push images
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: catalog
+            context: .
+            dockerfile: src/Services/Catalog/Catalog.Api/Dockerfile
+          - name: orders
+            context: .
+            dockerfile: src/Services/Orders/Orders.Api/Dockerfile
+          - name: gateway
+            context: .
+            dockerfile: src/Gateway/Gateway.Api/Dockerfile
+          - name: notifications
+            context: src/Services/Notifications
+            dockerfile: src/Services/Notifications/Dockerfile
+          - name: aisupport
+            context: src/Services/AiSupport
+            dockerfile: src/Services/AiSupport/Dockerfile
+          - name: storefront
+            context: src/Web/storefront
+            dockerfile: src/Web/storefront/Dockerfile
+          - name: admin
+            context: src/Web/admin
+            dockerfile: src/Web/admin/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Registry login
+        run: az acr login --name "${{ secrets.ACR_LOGIN_SERVER }}"
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ secrets.ACR_LOGIN_SERVER }}/${{ matrix.name }}:${{ github.ref_name }}
+
+  deploy:
+    name: Deploy to AKS
+    needs: build-push
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ secrets.AKS_RESOURCE_GROUP }}
+          cluster-name: ${{ secrets.AKS_CLUSTER_NAME }}
+      - uses: azure/setup-helm@v4
+      - name: Helm upgrade
+        run: |
+          helm upgrade --install nexus deploy/helm/nexuscommerce \
+            -f deploy/helm/nexuscommerce/values-${ENVIRONMENT}.yaml \
+            --set image.registry=${{ secrets.ACR_LOGIN_SERVER }} \
+            --set image.tag=${{ github.ref_name }} \
+            --wait --timeout 5m

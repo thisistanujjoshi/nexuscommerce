@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  dotnet:
+    name: .NET build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Restore
+        run: dotnet restore
+      - name: Build
+        run: dotnet build --no-restore -c Release
+      - name: Test
+        run: dotnet test --no-build -c Release --logger "trx;LogFileName=results.trx"
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-test-results
+          path: "**/results.trx"
+
+  python:
+    name: Python services (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [Notifications, AiSupport]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        working-directory: src/Services/${{ matrix.service }}
+        run: pip install -e ".[dev]"
+      - name: Test
+        working-directory: src/Services/${{ matrix.service }}
+        run: python -m pytest -q
+
+  frontends:
+    name: Frontends (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [storefront, admin]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install
+        working-directory: src/Web/${{ matrix.app }}
+        run: npm ci
+      - name: Build
+        working-directory: src/Web/${{ matrix.app }}
+        run: npm run build
+
+  helm:
+    name: Helm lint & template
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: Lint
+        run: helm lint deploy/helm/nexuscommerce -f deploy/helm/nexuscommerce/values-dev.yaml
+      - name: Template (all environments)
+        run: |
+          for env in dev staging prod; do
+            helm template nexus deploy/helm/nexuscommerce \
+              -f deploy/helm/nexuscommerce/values-$env.yaml > /dev/null
+          done
