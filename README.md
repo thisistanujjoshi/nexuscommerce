@@ -23,6 +23,7 @@ src/
   Services/
     Catalog/        # Catalog.Api, Catalog.Application, Catalog.Domain, Catalog.Infrastructure
     Orders/         # Orders.Api, Orders.Application, Orders.Domain, Orders.Infrastructure
+    Notifications/  # Python FastAPI event consumer (app/ + pytest tests/)
   Web/
     storefront/     # React + TypeScript customer storefront (Vite)
     admin/          # Vue 3 + TypeScript admin dashboard (Vite)
@@ -34,7 +35,7 @@ docs/               # Architecture notes and ADRs
 
 - [x] **Phase 1** — Catalog + Orders services, database schemas, unit tests
 - [x] **Phase 2** — React storefront + Vue admin dashboard
-- [ ] **Phase 3** — Notifications service, message queue, event-driven integration
+- [x] **Phase 3** — Notifications service, message queue, event-driven integration
 - [ ] **Phase 4** — AI support chatbot, API gateway with JWT auth
 - [ ] **Phase 5** — Docker, Kubernetes + Helm, Terraform, CI/CD pipelines
 
@@ -57,6 +58,19 @@ dotnet run --project src/Services/Orders/Orders.Api     # http://localhost:5102
 ```
 
 Swagger UI is available at `/swagger` on each API in development.
+
+Run the Notifications service (Python 3.12+):
+
+```bash
+cd src/Services/Notifications
+python -m venv .venv && .venv/Scripts/pip install -e ".[dev]"   # Scripts -> bin on Linux/macOS
+.venv/Scripts/python -m pytest                                   # run its tests
+.venv/Scripts/python -m uvicorn app.main:app --port 5103         # http://localhost:5103 (docs at /docs)
+```
+
+In development, Orders publishes `order.placed` / `order.status-changed` events over HTTP
+straight to the Notifications ingress; with a broker available both sides switch to
+RabbitMQ via configuration (`EventBus:Transport` / `NOTIF_TRANSPORT`) — see ADR 0003.
 
 Run the frontends (Node 20+):
 

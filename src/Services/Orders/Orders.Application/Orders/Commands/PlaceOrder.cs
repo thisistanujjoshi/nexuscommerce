@@ -1,5 +1,6 @@
 using MediatR;
 using Orders.Application.Abstractions;
+using Orders.Application.Events;
 using Orders.Domain.Entities;
 
 namespace Orders.Application.Orders.Commands;
@@ -11,7 +12,8 @@ public record PlaceOrderCommand(
     string CustomerEmail,
     IReadOnlyList<PlaceOrderItem> Items) : IRequest<OrderDto>;
 
-public class PlaceOrderHandler(IOrdersDbContext context) : IRequestHandler<PlaceOrderCommand, OrderDto>
+public class PlaceOrderHandler(IOrdersDbContext context, IEventPublisher publisher)
+    : IRequestHandler<PlaceOrderCommand, OrderDto>
 {
     public async Task<OrderDto> Handle(PlaceOrderCommand request, CancellationToken cancellationToken)
     {
@@ -22,6 +24,9 @@ public class PlaceOrderHandler(IOrdersDbContext context) : IRequestHandler<Place
 
         context.Orders.Add(order);
         await context.SaveChangesAsync(cancellationToken);
+
+        await publisher.PublishAsync(
+            OrderEventTypes.Placed, OrderPlacedEvent.FromEntity(order), cancellationToken);
 
         return OrderDto.FromEntity(order);
     }
