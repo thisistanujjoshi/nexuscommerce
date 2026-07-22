@@ -30,6 +30,12 @@ src/
   Web/
     storefront/     # React + TypeScript customer storefront (Vite)
     admin/          # Vue 3 + TypeScript admin dashboard (Vite)
+deploy/
+  helm/             # Umbrella Helm chart + per-environment values
+  terraform/        # Azure infrastructure (AKS, ACR, Key Vault, PostgreSQL)
+  pipelines/        # Azure DevOps + Jenkins pipelines
+.github/workflows/  # GitHub Actions CI/CD
+docker-compose.yml  # Run the whole platform locally
 tests/              # xUnit + Moq unit tests per service
 docs/               # Architecture notes and ADRs
 ```
@@ -40,7 +46,7 @@ docs/               # Architecture notes and ADRs
 - [x] **Phase 2** — React storefront + Vue admin dashboard
 - [x] **Phase 3** — Notifications service, message queue, event-driven integration
 - [x] **Phase 4** — AI support chatbot, API gateway with JWT auth
-- [ ] **Phase 5** — Docker, Kubernetes + Helm, Terraform, CI/CD pipelines
+- [x] **Phase 5** — Docker, Kubernetes + Helm, Terraform, CI/CD pipelines
 
 ## Getting started
 
@@ -103,6 +109,33 @@ curl http://localhost:5100/orders/api/v1/orders -H "Authorization: Bearer <token
 Demo users: `admin/admin123` (admin role), `demo/demo123` (customer). Catalog reads and
 AI chat are anonymous; orders require a token; catalog writes and notifications require
 the admin role — see ADR 0004.
+
+## Run the whole platform in containers
+
+```bash
+docker compose up -d        # gateway + 5 services + 2 frontends + Postgres/RabbitMQ/MongoDB
+docker compose ps           # watch health
+docker compose down         # stop everything
+```
+
+Everything is published on the same host ports as local dev (gateway 5100,
+storefront 5173, admin 5174, …). Set `ANTHROPIC_API_KEY` and `AISUPPORT_LLM=anthropic`
+before `up` to run the chatbot against Claude; it defaults to the offline stub.
+
+## Deploy to Kubernetes
+
+```bash
+# Provision Azure infra (AKS, ACR, Key Vault, PostgreSQL)
+cd deploy/terraform && terraform init && terraform apply -var environment=dev
+
+# Deploy the platform
+helm upgrade --install nexus deploy/helm/nexuscommerce \
+  -f deploy/helm/nexuscommerce/values-dev.yaml
+```
+
+CI runs on every push via [GitHub Actions](.github/workflows/ci.yml) (builds and
+tests every stack, lints and renders the Helm chart). Azure DevOps and Jenkins
+equivalents live in `deploy/pipelines/`. See ADR 0005 for the full deployment story.
 
 ## Local infrastructure (Docker)
 

@@ -1,0 +1,92 @@
+# Azure DevOps pipeline — the platform's second CI/CD path (see OpsForge's
+# dual-pipeline story). Mirrors the GitHub Actions workflow: build & test,
+# security scan, build/push images, deploy to AKS with an approval gate.
+
+trigger:
+  branches:
+    include: [main]
+  tags:
+    include: ["v*"]
+
+variables:
+  buildConfiguration: "Release"
+  dotnetVersion: "10.0.x"
+
+stages:
+  - stage: Build
+    displayName: Build & test
+    jobs:
+      - job: dotnet
+        displayName: .NET build & test
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: UseDotNet@2
+            inputs:
+              version: $(dotnetVersion)
+          - script: dotnet test -c $(buildConfiguration) --logger trx
+            displayName: dotnet test
+          - task: PublishTestResults@2
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: VSTest
+              testResultsFiles: "**/*.trx"
+
+      - job: python
+        displayName: Python services
+        pool:
+          vmImage: ubuntu-latest
+        strategy:
+          matrix:
+            notifications:
+              service: Notifications
+            aisupport:
+              service: AiSupport
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: "3.12"
+          - script: |
+              cd src/Services/$(service)
+              pip install -e ".[dev]"
+              python -m pytest -q
+            displayName: pytest
+
+  - stage: Security
+    displayName: Security scan
+    dependsOn: Build
+    jobs:
+      - job: scan
+        displayName: Dependency & image scan
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - script: echo "Run Trivy / dependency-check / secret scan here."
+            displayName: Security scanning (placeholder)
+
+  - stage: Deploy
+    displayName: Deploy to AKS
+    dependsOn: Security
+    condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
+    jobs:
+      - deployment: deploy
+        displayName: Helm deploy
+        environment: staging          # approval gate configured on the environment
+        pool:
+          vmImage: ubuntu-latest
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: HelmDeploy@0
+                  inputs:
+                    connectionType: Azure Resource Manager
+                    azureSubscription: nexuscommerce-sc
+                    azureResourceGroup: $(aksResourceGroup)
+                    kubernetesCluster: $(aksClusterName)
+                    command: upgrade
+                    chartType: FilePath
+                    chartPath: deploy/helm/nexuscommerce
+                    releaseName: nexus
+                    overrideValues: image.tag=$(Build.SourceBranchName)
+                    valueFile: deploy/helm/nexuscommerce/values-staging.yaml

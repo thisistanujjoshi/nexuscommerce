@@ -1,0 +1,83 @@
+// Jenkins declarative pipeline — the third CI/CD path documented in OpsForge's
+// dual-pipeline comparison. Same shape as the GitHub Actions and Azure DevOps
+// pipelines: build & test, security scan, image build/push, gated deploy.
+
+pipeline {
+  agent any
+
+  environment {
+    ACR_LOGIN_SERVER = credentials('acr-login-server')
+    DOTNET_CLI_TELEMETRY_OPTOUT = '1'
+  }
+
+  stages {
+    stage('Build & test') {
+      parallel {
+        stage('.NET') {
+          steps {
+            sh 'dotnet test -c Release --logger "trx;LogFileName=results.trx"'
+          }
+          post {
+            always { mstest testResultsFile: '**/results.trx' }
+          }
+        }
+        stage('Python') {
+          steps {
+            sh '''
+              for svc in Notifications AiSupport; do
+                (cd src/Services/$svc && pip install -e ".[dev]" && python -m pytest -q)
+              done
+            '''
+          }
+        }
+        stage('Frontends') {
+          steps {
+            sh '''
+              for app in storefront admin; do
+                (cd src/Web/$app && npm ci && npm run build)
+              done
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Security scan') {
+      steps {
+        sh 'echo "Run Trivy / dependency-check / secret scan here."'
+      }
+    }
+
+    stage('Build & push images') {
+      when { buildingTag() }
+      steps {
+        sh '''
+          for svc in catalog orders gateway notifications aisupport storefront admin; do
+            echo "docker build & push $ACR_LOGIN_SERVER/$svc:$TAG_NAME"
+          done
+        '''
+      }
+    }
+
+    stage('Deploy to AKS') {
+      when { buildingTag() }
+      input {
+        message 'Deploy to staging?'
+        ok 'Deploy'
+      }
+      steps {
+        sh '''
+          helm upgrade --install nexus deploy/helm/nexuscommerce \
+            -f deploy/helm/nexuscommerce/values-staging.yaml \
+            --set image.registry=$ACR_LOGIN_SERVER \
+            --set image.tag=$TAG_NAME --wait --timeout 5m
+        '''
+      }
+    }
+  }
+
+  post {
+    success { echo 'Pipeline succeeded.' }
+    failure { echo 'Pipeline failed — see stage logs.' }
+  }
+}

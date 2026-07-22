@@ -33,6 +33,13 @@ venv/
 *.db-shm
 *.db-wal
 
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+crash.log
+
 # OS
 Thumbs.db
 .DS_Store
