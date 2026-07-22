@@ -27,6 +27,15 @@ class LlmClient(Protocol):
 
 class AnthropicLlm:
     def __init__(self, model: str, max_tokens: int) -> None:
+        # Trust the OS certificate store so outbound TLS works behind a
+        # corporate/AV proxy whose root CA isn't in certifi's bundle.
+        try:
+            import truststore
+
+            truststore.inject_into_ssl()
+        except ImportError:
+            pass
+
         from anthropic import AsyncAnthropic
 
         self._client = AsyncAnthropic()
