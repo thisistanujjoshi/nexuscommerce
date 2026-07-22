@@ -23,6 +23,9 @@ src/
   Services/
     Catalog/        # Catalog.Api, Catalog.Application, Catalog.Domain, Catalog.Infrastructure
     Orders/         # Orders.Api, Orders.Application, Orders.Domain, Orders.Infrastructure
+  Web/
+    storefront/     # React + TypeScript customer storefront (Vite)
+    admin/          # Vue 3 + TypeScript admin dashboard (Vite)
 tests/              # xUnit + Moq unit tests per service
 docs/               # Architecture notes and ADRs
 ```
@@ -30,7 +33,7 @@ docs/               # Architecture notes and ADRs
 ## Roadmap
 
 - [x] **Phase 1** — Catalog + Orders services, database schemas, unit tests
-- [ ] **Phase 2** — React storefront + Vue admin dashboard
+- [x] **Phase 2** — React storefront + Vue admin dashboard
 - [ ] **Phase 3** — Notifications service, message queue, event-driven integration
 - [ ] **Phase 4** — AI support chatbot, API gateway with JWT auth
 - [ ] **Phase 5** — Docker, Kubernetes + Helm, Terraform, CI/CD pipelines
@@ -46,10 +49,21 @@ dotnet build
 dotnet test
 ```
 
-Run the Catalog API:
+Run the APIs:
 
 ```bash
-dotnet run --project src/Services/Catalog/Catalog.Api
+dotnet run --project src/Services/Catalog/Catalog.Api   # http://localhost:5101
+dotnet run --project src/Services/Orders/Orders.Api     # http://localhost:5102
 ```
 
-Swagger UI is available at `/swagger` in development.
+Swagger UI is available at `/swagger` on each API in development.
+
+Run the frontends (Node 20+):
+
+```bash
+cd src/Web/storefront && npm install && npm run dev     # http://localhost:5173
+cd src/Web/admin && npm install && npm run dev          # http://localhost:5174
+```
+
+The dev servers point at the API ports above by default; override with
+`VITE_CATALOG_API` / `VITE_ORDERS_API` env vars. Storefront unit tests: `npm test`.

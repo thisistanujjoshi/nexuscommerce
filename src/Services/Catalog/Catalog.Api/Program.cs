@@ -24,7 +24,16 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.AddHealthChecks();
 
+// Dev-time CORS for the storefront/admin dev servers (any localhost port);
+// in production the API gateway fronts all services on a single origin.
+builder.Services.AddCors(options => options.AddPolicy("Frontends", policy => policy
+    .SetIsOriginAllowed(origin => new Uri(origin).IsLoopback)
+    .AllowAnyHeader()
+    .AllowAnyMethod()));
+
 var app = builder.Build();
+
+app.UseCors("Frontends");
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
