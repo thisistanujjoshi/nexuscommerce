@@ -3,6 +3,7 @@ using Orders.Api.Middleware;
 using Orders.Application.Orders.Commands;
 using Orders.Infrastructure;
 using Orders.Infrastructure.Persistence;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,8 +50,11 @@ if (app.Environment.IsDevelopment())
     await db.Database.EnsureCreatedAsync();
 }
 
+app.UseHttpMetrics();
+
 app.MapControllers();
 app.MapHealthChecks("/health");
+app.MapMetrics();
 
 app.Run();
 

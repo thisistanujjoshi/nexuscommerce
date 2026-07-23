@@ -10,6 +10,7 @@ dependencies = [
     "pydantic-settings>=2.3",
     "aio-pika>=9.4",
     "motor>=3.4",
+    "prometheus-fastapi-instrumentator>=7.0",
 ]
 
 [project.optional-dependencies]

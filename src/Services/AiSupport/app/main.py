@@ -45,6 +45,11 @@ def create_app(
         ),
     )
 
+    # Prometheus metrics at /metrics (scraped by the OpsForge observability stack).
+    from prometheus_fastapi_instrumentator import Instrumentator
+
+    Instrumentator(excluded_handlers=["/metrics", "/health"]).instrument(app).expose(app)
+
     @app.get("/health")
     async def health() -> dict:
         return {"status": "Healthy", "llm": config.llm, "model": config.model}

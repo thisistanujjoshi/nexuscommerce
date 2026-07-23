@@ -2,6 +2,7 @@ using System.Text;
 using Gateway.Api.Auth;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -47,6 +48,7 @@ builder.Services.AddCors(options => options.AddPolicy("Frontends", policy => pol
 var app = builder.Build();
 
 app.UseCors("Frontends");
+app.UseHttpMetrics();
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -59,6 +61,7 @@ app.MapPost("/auth/token", (TokenRequest request, TokenService tokens) =>
 });
 
 app.MapHealthChecks("/health");
+app.MapMetrics();
 app.MapReverseProxy();
 
 app.Run();

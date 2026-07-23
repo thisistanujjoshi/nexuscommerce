@@ -44,6 +44,11 @@ def create_app(config: Settings | None = None, store: NotificationStore | None =
         lifespan=lifespan,
     )
 
+    # Prometheus metrics at /metrics (scraped by the OpsForge observability stack).
+    from prometheus_fastapi_instrumentator import Instrumentator
+
+    Instrumentator(excluded_handlers=["/metrics", "/health"]).instrument(app).expose(app)
+
     @app.get("/health")
     async def health() -> dict:
         return {"status": "Healthy", "transport": config.transport, "store": config.store}

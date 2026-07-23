@@ -3,6 +3,7 @@ using Catalog.Application.Categories;
 using Catalog.Application.Products;
 using Catalog.Infrastructure;
 using Catalog.Infrastructure.Persistence;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -47,8 +48,11 @@ if (app.Environment.IsDevelopment())
     await CatalogDbSeeder.SeedAsync(db);
 }
 
+app.UseHttpMetrics();
+
 app.MapControllers();
 app.MapHealthChecks("/health");
+app.MapMetrics();
 
 app.Run();
 
